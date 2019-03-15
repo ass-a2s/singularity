@@ -694,19 +694,27 @@ func (c *container) addDefaultDevices(system *mount.System) error {
 					sylog.Debugf("skipping mount, %s doesn't exists", device.path)
 					continue
 				}
+				dirpath := filepath.Dir(path)
+				if _, err := c.rpcOps.MkdirAll(dirpath, 0755); err != nil {
+					return fmt.Errorf("could not create parent directory %s: %s", dirpath, err)
+				}
 				if _, err := c.rpcOps.Touch(path); err != nil {
-					return err
+					return fmt.Errorf("could not create file %s: %s", path, err)
 				}
 				if _, err := c.rpcOps.Mount(device.path, path, "", syscall.MS_BIND, ""); err != nil {
-					return err
+					return fmt.Errorf("could not mount %s to %s: %s", device.path, path, err)
 				}
 			} else {
+				dirpath := filepath.Dir(path)
+				if err := os.MkdirAll(dirpath, 0755); err != nil {
+					return fmt.Errorf("could not create parent directory %s: %s", dirpath, err)
+				}
 				if err := syscall.Mknod(path, uint32(device.mode), dev); err != nil {
-					return fmt.Errorf("mknod: %s", err)
+					return fmt.Errorf("could not create device %s: %s", path, err)
 				}
 				if device.uid != 0 || device.gid != 0 {
 					if err := os.Chown(path, device.uid, device.gid); err != nil {
-						return err
+						return fmt.Errorf("could not change %s owner: %s", path, err)
 					}
 				}
 			}
@@ -804,7 +812,7 @@ func (c *container) addMaskedPathsMount(system *mount.System) error {
 
 	for _, path := range paths {
 		relativePath := filepath.Join(c.rootfs, path)
-		rpcPath := filepath.Join(c.rpcRoot, path)
+		rpcPath := filepath.Join(c.rpcRoot, relativePath)
 		fi, err := os.Stat(rpcPath)
 		if err != nil {
 			sylog.Debugf("ignoring masked path %s: %s", path, err)
@@ -826,6 +834,12 @@ func (c *container) addReadonlyPathsMount(system *mount.System) error {
 
 	for _, path := range paths {
 		relativePath := filepath.Join(c.rootfs, path)
+		rpcPath := filepath.Join(c.rpcRoot, relativePath)
+		_, err := os.Stat(rpcPath)
+		if err != nil {
+			sylog.Debugf("ignoring read-only path %s: %s", path, err)
+			continue
+		}
 		if err := system.Points.AddBind(mount.OtherTag, relativePath, relativePath, syscall.MS_BIND|syscall.MS_RDONLY); err != nil {
 			return err
 		}
@@ -922,7 +936,8 @@ func (c *container) mount(point *mount.Point) error {
 
 		sylog.Debugf("Checking if %s exists", procDest)
 		if _, err := os.Stat(procDest); os.IsNotExist(err) {
-			return fmt.Errorf("destination %s doesn't exist", dest)
+			sylog.Warningf("destination %s doesn't exist", dest)
+			return nil
 		}
 	}
 

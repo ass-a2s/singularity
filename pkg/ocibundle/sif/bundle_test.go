@@ -13,6 +13,8 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/sylabs/singularity/pkg/ocibundle/tools"
+
 	"github.com/opencontainers/runtime-tools/generate"
 	"github.com/sylabs/singularity/internal/pkg/test"
 )
@@ -52,7 +54,7 @@ func TestFromSif(t *testing.T) {
 	}
 	// create OCI bundle from SIF
 	if err := bundle.Create(nil); err == nil {
-		// check if cleanup occured
+		// check if cleanup occurred
 		t.Errorf("unexpected success while creating OCI bundle")
 	}
 
@@ -68,10 +70,10 @@ func TestFromSif(t *testing.T) {
 	}
 	// remove seccomp filter for CI
 	g.Config.Linux.Seccomp = nil
-	g.SetProcessArgs([]string{"/.singularity.d/actions/run", "id"})
+	g.SetProcessArgs([]string{tools.RunScript, "id"})
 
 	if err := bundle.Create(g.Config); err != nil {
-		// check if cleanup occured
+		// check if cleanup occurred
 		t.Fatal(err)
 	}
 
