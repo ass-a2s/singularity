@@ -77,18 +77,18 @@ func TestHostname(t *testing.T) {
 	test.DropPrivilege(t)
 	defer test.ResetPrivilege(t)
 
-	content, err := Hostname("")
+	_, err := Hostname("")
 	if err == nil {
 		t.Errorf("should have failed with empty hostname")
 	}
-	content, err = Hostname("mycontainer")
+	content, err := Hostname("mycontainer")
 	if err != nil {
 		t.Errorf("should have passed with correct hostname")
 	}
-	if bytes.Compare(content, []byte("mycontainer\n")) != 0 {
+	if !bytes.Equal(content, []byte("mycontainer\n")) {
 		t.Errorf("Hostname returns a bad content")
 	}
-	content, err = Hostname("bad|hostname")
+	_, err = Hostname("bad|hostname")
 	if err == nil {
 		t.Errorf("should have failed with non valid hostname")
 	}
@@ -98,19 +98,19 @@ func TestResolvConf(t *testing.T) {
 	test.DropPrivilege(t)
 	defer test.ResetPrivilege(t)
 
-	content, err := ResolvConf([]string{})
+	_, err := ResolvConf([]string{})
 	if err == nil {
 		t.Errorf("should have failed with empty dns")
 	}
-	content, err = ResolvConf([]string{"test"})
+	_, err = ResolvConf([]string{"test"})
 	if err == nil {
 		t.Errorf("should have failed with bad dns")
 	}
-	content, err = ResolvConf([]string{"8.8.8.8"})
+	content, err := ResolvConf([]string{"8.8.8.8"})
 	if err != nil {
 		t.Errorf("should have passed with valid dns")
 	}
-	if bytes.Compare(content, []byte("nameserver 8.8.8.8\n")) != 0 {
+	if !bytes.Equal(content, []byte("nameserver 8.8.8.8\n")) {
 		t.Errorf("ResolvConf returns a bad content")
 	}
 }

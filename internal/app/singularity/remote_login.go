@@ -11,15 +11,16 @@ import (
 
 	"github.com/sylabs/singularity/internal/pkg/remote"
 	"github.com/sylabs/singularity/internal/pkg/sylog"
+	"github.com/sylabs/singularity/internal/pkg/util/auth"
 	"github.com/sylabs/singularity/pkg/sypgp"
 )
 
 // RemoteLogin logs in remote by setting API token
-func RemoteLogin(configFile, name string) (err error) {
+func RemoteLogin(usrConfigFile, sysConfigFile, name, tokenfile string) (err error) {
 	c := &remote.Config{}
 
 	// opening config file
-	file, err := os.OpenFile(configFile, os.O_RDWR|os.O_CREATE, 0600)
+	file, err := os.OpenFile(usrConfigFile, os.O_RDWR|os.O_CREATE, 0600)
 	if err != nil {
 		return fmt.Errorf("while opening remote config file: %s", err)
 	}
@@ -31,15 +32,27 @@ func RemoteLogin(configFile, name string) (err error) {
 		return fmt.Errorf("while parsing remote config data: %s", err)
 	}
 
+	if err := syncSysConfig(c, sysConfigFile); err != nil {
+		return err
+	}
+
 	r, err := c.GetRemote(name)
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Generate an API Key at https://%s/auth/tokens, and paste here:\n", r.URI)
-	r.Token, err = sypgp.AskQuestionNoEcho("API Key: ")
-	if err != nil {
-		return err
+	if tokenfile != "" {
+		var authWarning string
+		r.Token, authWarning = auth.ReadToken(tokenfile)
+		if authWarning != "" {
+			return fmt.Errorf("while reading tokenfile: %s", authWarning)
+		}
+	} else {
+		fmt.Printf("Generate an API Key at https://%s/auth/tokens, and paste here:\n", r.URI)
+		r.Token, err = sypgp.AskQuestionNoEcho("API Key: ")
+		if err != nil {
+			return err
+		}
 	}
 
 	if err := r.VerifyToken(); err != nil {

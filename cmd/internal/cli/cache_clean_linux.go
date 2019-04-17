@@ -23,7 +23,7 @@ var (
 func init() {
 	CacheCleanCmd.Flags().SetInterspersed(false)
 
-	CacheCleanCmd.Flags().BoolVarP(&cleanAll, "all", "a", false, "clean all cache (will overide all other options)")
+	CacheCleanCmd.Flags().BoolVarP(&cleanAll, "all", "a", false, "clean all cache (will override all other options)")
 	CacheCleanCmd.Flags().SetAnnotation("all", "envkey", []string{"ALL"})
 
 	CacheCleanCmd.Flags().StringSliceVarP(&cacheCleanTypes, "type", "T", []string{"blob"}, "clean cache type, choose between: library, oci, and blob")
@@ -35,7 +35,6 @@ func init() {
 
 // CacheCleanCmd : is `singularity cache clean' and will clear your local singularity cache
 var CacheCleanCmd = &cobra.Command{
-	Args:                  cobra.ExactArgs(0),
 	DisableFlagsInUseLine: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := cacheCleanCmd(); err != nil {

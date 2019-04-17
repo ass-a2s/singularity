@@ -2,8 +2,6 @@
 
 if [ -z "$OS_TYPE" ]; then
     # default is ubuntu
-    curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-    go get -u golang.org/x/lint/golint
     exit
 fi
 

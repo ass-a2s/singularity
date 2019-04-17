@@ -23,15 +23,15 @@ Enterprise Performance Computing (EPC)`
   Singularity one is capable of building a root file system that runs on any 
   other Linux system where Singularity is installed.`
 	SingularityExample string = `
-  $ singularity help <command>
-      Additional help for any Singularity subcommand can be seen by appending
-      the subcommand name to the above command.`
+  $ singularity help <command> [<subcommand>]
+  $ singularity help build
+  $ singularity help instance start`
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// build
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	BuildUse   string = `build [local options...] <IMAGE PATH> <BUILD SPEC>`
-	BuildShort string = `Build a new Singularity container`
+	BuildShort string = `Build a Singularity image`
 	BuildLong  string = `
 
   IMAGE PATH:
@@ -159,11 +159,10 @@ Enterprise Performance Computing (EPC)`
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// Cache
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	CacheUse   string = `cache <subcommand>`
-	CacheShort string = `Manage your local singularity cache`
+	CacheUse   string = `cache`
+	CacheShort string = `Manage the local cache`
 	CacheLong  string = `
-  Manage your local singularity cache. There are 3 types of cache; library, oci, and blob.
-  You can list/clean using the spicific types.`
+  Manage your local singularity cache. You can list/clean using the specific types.`
 	CacheExample string = `
   All group commands have their own help output:
 
@@ -176,9 +175,8 @@ Enterprise Performance Computing (EPC)`
 	CacheCleanUse   string = `clean [clean options...]`
 	CacheCleanShort string = `Clean your local Singularity cache`
 	CacheCleanLong  string = `
-  This will clean you local cache: "${HOME}/.singularity/cache". The available cache
-  types are: library, oci, and blob. By default cache clean will only clean blob cache,
-  use: '--all' to clean all cache.`
+  This will clean your local cache (stored at $HOME/.singularity/cache if SINGULARITY_CACHEDIR is not set).
+  By default only blob cache is cleaned, use '--all' to clean the entire cache.`
 	CacheCleanExample string = `
   All group commands have their own help output:
 
@@ -192,8 +190,7 @@ Enterprise Performance Computing (EPC)`
 	CacheListUse   string = `list [list options...]`
 	CacheListShort string = `List your local Singularity cache`
 	CacheListLong  string = `
-  This will list you local cache: "${HOME}/.singularity/cache". The available cache
-  types are: library, oci, and blob.`
+  This will list your local cache (stored at $HOME/.singularity/cache if SINGULARITY_CACHEDIR is not set).`
 	CacheListExample string = `
   All group commands have their own help output:
 
@@ -204,11 +201,8 @@ Enterprise Performance Computing (EPC)`
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// key
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	KeyUse string = `key [key options...] <subcommand>`
-
-	// keys : for the hidden `keys` command
-	KeysUse  string = `keys [keys options...] <subcommand>`
-	KeyShort string = `Manage OpenPGP key stores`
+	KeyUse   string = `key [key options...]`
+	KeyShort string = `Manage OpenPGP keys`
 	KeyLong  string = `
   The 'key' command allows you to manage local OpenPGP key stores by creating
   a new store and new key pairs. You can also list available keys from the
@@ -220,16 +214,35 @@ Enterprise Performance Computing (EPC)`
   $ singularity help key newpair
   $ singularity key list --help`
 
+	// keys : for the hidden `keys` command
+	KeysUse string = `keys [keys options...]`
+
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// key import
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	KeyImportUse   string = `import [import options...] <full-path-to-local-key>`
-	KeyImportShort string = `Import a local key into the local Singularity key store`
+	KeyImportUse   string = `import [import options...] <input-key>`
+	KeyImportShort string = `Import a local key into the local keyring`
 	KeyImportLong  string = `
   The 'key import' command allows you to add to your local key store, keys from a specific local folder`
 	KeyImportExample string = `
-  $ singularity key import $HOME/key.asc
-  $ singularity keys import $HOME/key.asc
+  $ singularity key import ./my-key.asc
+  `
+
+	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	// key export
+	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	KeyExportUse   string = `export [export options...] <key-fingerprint> <output-file>`
+	KeyExportShort string = `Export a public or private key into a specific file`
+	KeyExportLong  string = `
+  The 'key export' command allows you to export a key (either private or public) and save it on a local file`
+	KeyExportExample string = `
+  Exporting a private key:
+  
+  $ singularity key export --secret <path_to_file>
+
+  Exporting a public key:
+  
+  $ singularity key export <path_to_file>
   `
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -261,10 +274,18 @@ Enterprise Performance Computing (EPC)`
 	KeySearchUse   string = `search [search options...] <search_string>`
 	KeySearchShort string = `Search for keys matching string argument`
 	KeySearchLong  string = `
-  The 'key search' command allows you to connect to a key server and look for 
-  public keys matching the string argument passed to the command line.`
+  The 'key search' command allows you to connect to a key server and look for
+  public keys matching the argument passed to the command line. You can
+  also search for a key by fingerprint or key ID by adding '0x' before the
+  fingerprint. (Maximum 100 search entities)`
 	KeySearchExample string = `
-  $ singularity key search sylabs.io`
+  $ singularity key search sylabs.io
+
+  # note the '0x' before the fingerprint:
+  $ singularity key search 0x8883491F4268F173C6E5DC49EDECE4F3F38D871E
+
+  # search by key ID: (again, there's '0x' before the ID)
+  $ singularity key search 0xF38D871E`
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// key pull
@@ -276,7 +297,7 @@ Enterprise Performance Computing (EPC)`
   download a public key. Key rings are stored into (e.g., 
   $HOME/.singularity/sypgp).`
 	KeyPullExample string = `
-  $ singularity key pull D87FE3AF5C1F063FCBCC9B02F812842B5EEE5934`
+  $ singularity key pull 8883491F4268F173C6E5DC49EDECE4F3F38D871E`
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// key push
@@ -287,16 +308,27 @@ Enterprise Performance Computing (EPC)`
   The 'key push' command allows you to connect to a key server and upload 
   public keys from the local key store.`
 	KeyPushExample string = `
-  $ singularity key push D87FE3AF5C1F063FCBCC9B02F812842B5EEE5934`
+  $ singularity key push 8883491F4268F173C6E5DC49EDECE4F3F38D871E`
+
+	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	// key remove
+	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	KeyRemoveUse     string = `remove <fingerprint>`
+	KeyRemoveShort   string = `Remove a local public key`
+	KeyRemoveLong    string = `The 'key remove' command will remove a local public key.`
+	KeyRemoveExample string = `
+  $ singularity key remove D87FE3AF5C1F063FCBCC9B02F812842B5EEE5934`
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// capability
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	CapabilityUse   string = `capability <subcommand>`
-	CapabilityShort string = `Manage Linux capabilities on containers`
+	CapabilityUse   string = `capability`
+	CapabilityShort string = `Manage Linux capabilities for users and groups`
 	CapabilityLong  string = `
   Capabilities allow you to have fine grained control over the permissions that
-  your containers need to run.`
+  your containers need to run.
+
+  NOTE: capability add/drop commands requires root to run.`
 	CapabilityExample string = `
   All group commands have their own help output:
 
@@ -307,130 +339,77 @@ Enterprise Performance Computing (EPC)`
 	// capability add
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	CapabilityAddUse   string = `add [add options...] <capabilities>`
-	CapabilityAddShort string = `Add authorized capabilities for a given user/group`
+	CapabilityAddShort string = `Add capabilities to a user or group (requires root)`
 	CapabilityAddLong  string = `
-  Capabilities must be separated by commas and are not case sensitive,
-  here accepted values:
+  Add Linux capabilities to a user or group. NOTE: This command requires root to run.
 
-  CAP_AUDIT_CONTROL     | AUDIT_CONTROL
-  CAP_AUDIT_READ        | AUDIT_READ
-  CAP_AUDIT_WRITE       | AUDIT_WRITE
-  CAP_BLOCK_SUSPEND     | BLOCK_SUSPEND
-  CAP_CHOWN             | CHOWN
-  CAP_DAC_OVERRIDE      | DAC_OVERRIDE
-  CAP_DAC_READ_SEARCH   | DAC_READ_SEARCH
-  CAP_FOWNER            | FOWNER
-  CAP_FSETID            | FSETID
-  CAP_IPC_LOCK          | IPC_LOCK
-  CAP_IPC_OWNER         | IPC_OWNER
-  CAP_KILL              | KILL
-  CAP_LEASE             | LEASE
-  CAP_LINUX_IMMUTABLE   | LINUX_IMMUTABLE
-  CAP_MAC_ADMIN         | MAC_ADMIN
-  CAP_MAC_OVERRIDE      | MAC_OVERRIDE
-  CAP_MKNOD             | MKNOD
-  CAP_NET_ADMIN         | NET_ADMIN
-  CAP_NET_BIND_SERVICE  | NET_BIND_SERVICE
-  CAP_NET_BROADCAST     | NET_BROADCAST
-  CAP_NET_RAW           | NET_RAW
-  CAP_SETFCAP           | SETFCAP
-  CAP_SETGID            | SETGID
-  CAP_SETPCAP           | SETPCAP
-  CAP_SETUID            | SETUID
-  CAP_SYS_ADMIN         | SYS_ADMIN
-  CAP_SYS_BOOT          | SYS_BOOT
-  CAP_SYS_CHROOT        | SYS_CHROOT
-  CAP_SYSLOG            | SYSLOG
-  CAP_SYS_MODULE        | SYS_MODULE
-  CAP_SYS_NICE          | SYS_NICE
-  CAP_SYS_PACCT         | SYS_PACCT
-  CAP_SYS_PTRACE        | SYS_PTRACE
-  CAP_SYS_RAWIO         | SYS_RAWIO
-  CAP_SYS_RESOURCE      | SYS_RESOURCE
-  CAP_SYS_TIME          | SYS_TIME
-  CAP_SYS_TTY_CONFIG    | SYS_TTY_CONFIG
-  CAP_WAKE_ALARM        | WAKE_ALARM
+  The capabilities argument must be separated by commas and is not case sensitive.
 
-  See "-d" flag example for description of each capabilities`
+  To see available capabilities, type "singularity capability avail" or refer to
+  capabilities manual "man 7 capabilities".`
 	CapabilityAddExample string = `
-  $ singularity capability add --user nobody AUDIT_READ,chown
-  $ singularity capability add --group nobody cap_audit_write
+  $ sudo singularity capability add --user nobody AUDIT_READ,chown
+  $ sudo singularity capability add --group nobody cap_audit_write
 
-  To print capabilities description:
+  To add all capabilities to a user:
 
-  $ singularity capability add -d CAP_CHOWN
-  $ singularity capability add -d CAP_CHOWN,CAP_SYS_ADMIN`
+  $ sudo singularity capability add --user nobody all`
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// capability drop
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	CapabilityDropUse   string = `drop [drop options...] <capabilities>`
-	CapabilityDropShort string = `Drop authorized capabilities for a given user/group`
+	CapabilityDropShort string = `Remove capabilities from a user or group (requires root)`
 	CapabilityDropLong  string = `
-  Capabilities must be separated by commas and are not case sensitive,
-  here accepted values:
+  Remove Linux capabilities from an user/group. NOTE: This command requires root to run.
 
-  CAP_AUDIT_CONTROL     | AUDIT_CONTROL
-  CAP_AUDIT_READ        | AUDIT_READ
-  CAP_AUDIT_WRITE       | AUDIT_WRITE
-  CAP_BLOCK_SUSPEND     | BLOCK_SUSPEND
-  CAP_CHOWN             | CHOWN
-  CAP_DAC_OVERRIDE      | DAC_OVERRIDE
-  CAP_DAC_READ_SEARCH   | DAC_READ_SEARCH
-  CAP_FOWNER            | FOWNER
-  CAP_FSETID            | FSETID
-  CAP_IPC_LOCK          | IPC_LOCK
-  CAP_IPC_OWNER         | IPC_OWNER
-  CAP_KILL              | KILL
-  CAP_LEASE             | LEASE
-  CAP_LINUX_IMMUTABLE   | LINUX_IMMUTABLE
-  CAP_MAC_ADMIN         | MAC_ADMIN
-  CAP_MAC_OVERRIDE      | MAC_OVERRIDE
-  CAP_MKNOD             | MKNOD
-  CAP_NET_ADMIN         | NET_ADMIN
-  CAP_NET_BIND_SERVICE  | NET_BIND_SERVICE
-  CAP_NET_BROADCAST     | NET_BROADCAST
-  CAP_NET_RAW           | NET_RAW
-  CAP_SETFCAP           | SETFCAP
-  CAP_SETGID            | SETGID
-  CAP_SETPCAP           | SETPCAP
-  CAP_SETUID            | SETUID
-  CAP_SYS_ADMIN         | SYS_ADMIN
-  CAP_SYS_BOOT          | SYS_BOOT
-  CAP_SYS_CHROOT        | SYS_CHROOT
-  CAP_SYSLOG            | SYSLOG
-  CAP_SYS_MODULE        | SYS_MODULE
-  CAP_SYS_NICE          | SYS_NICE
-  CAP_SYS_PACCT         | SYS_PACCT
-  CAP_SYS_PTRACE        | SYS_PTRACE
-  CAP_SYS_RAWIO         | SYS_RAWIO
-  CAP_SYS_RESOURCE      | SYS_RESOURCE
-  CAP_SYS_TIME          | SYS_TIME
-  CAP_SYS_TTY_CONFIG    | SYS_TTY_CONFIG
-  CAP_WAKE_ALARM        | WAKE_ALARM
+  The capabilities argument must be separated by commas and is not case sensitive.
 
-  See "-d" flag example for description of each capabilities`
+  To see available capabilities, type "singularity capability avail" or refer to
+  capabilities manual "man 7 capabilities"`
 	CapabilityDropExample string = `
-  $ singularity capability drop --user nobody AUDIT_READ,CHOWN
-  $ singularity capability drop --group nobody audit_write
+  $ sudo singularity capability drop --user nobody AUDIT_READ,CHOWN
+  $ sudo singularity capability drop --group nobody audit_write
 
-  To print capabilities description:
+  To drop all capabilities for a user:
 
-  $ singularity capability drop -d CAP_CHOWN
-  $ singularity capability drop -d CAP_CHOWN,CAP_SYS_ADMIN`
+  $ sudo singularity capability drop --user nobody all`
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// capability list
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	CapabilityListUse   string = `list [list options...]`
-	CapabilityListShort string = `List authorized capabilities for the given user/group.`
+	CapabilityListUse   string = `list [user/group]`
+	CapabilityListShort string = `Show capabilities for a given user or group`
 	CapabilityListLong  string = `
-  The capability list command allows you to see
-  what Linux capabilities are associated with users/groups.`
+  Show the capabilities for a user or group.`
 	CapabilityListExample string = `
-  $ singularity capability list --user nobody
-  $ singularity capability list --group nobody
-  $ singularity capability list --all`
+  To list capabilities set for user or group nobody:
+
+  $ singularity capability list nobody
+
+  To list capabilities for all users/groups:
+
+  $ singularity capability list`
+
+	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	// capability avail
+	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	CapabilityAvailUse   string = `avail [capabilities]`
+	CapabilityAvailShort string = `Show description for available capabilities`
+	CapabilityAvailLong  string = `
+  Show description for available Linux capabilities.`
+	CapabilityAvailExample string = `
+  Show description for all available capabilities:
+
+  $ singularity capability avail
+
+  Show CAP_CHOWN description:
+
+  $ singularity capability avail CAP_CHOWN
+
+  Show CAP_CHOWN/CAP_NET_RAW description:
+
+  $ singularity capability avail CAP_CHOWN,CAP_NET_RAW`
 
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// exec
@@ -456,7 +435,7 @@ Enterprise Performance Computing (EPC)`
 
   shub://*            A container hosted on Singularity Hub`
 	ExecUse   string = `exec [exec options...] <container> <command>`
-	ExecShort string = `Execute a command within container`
+	ExecShort string = `Run a command within a container`
 	ExecLong  string = `
   singularity exec supports the following formats:` + formats
 	ExecExamples string = `
@@ -470,8 +449,8 @@ Enterprise Performance Computing (EPC)`
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// instance
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	InstanceUse   string = `instance <subcommand>`
-	InstanceShort string = `Manage containers running in the background`
+	InstanceUse   string = `instance`
+	InstanceShort string = `Manage containers running as services`
 	InstanceLong  string = `
   Instances allow you to run containers as background processes. This can be
   useful for running services such as web servers or databases.`
@@ -484,7 +463,7 @@ Enterprise Performance Computing (EPC)`
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// instance list
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	InstanceListUse   string = `list [list options...] <container>`
+	InstanceListUse   string = `list [list options...]`
 	InstanceListShort string = `List all running and named Singularity instances`
 	InstanceListLong  string = `
   The instance list command allows you to view the Singularity container
@@ -557,13 +536,13 @@ Enterprise Performance Computing (EPC)`
 	// pull
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	PullUse   string = `pull [pull options...] [output file] <URI>`
-	PullShort string = `Pull a container from a URI`
+	PullShort string = `Pull an image from a URI`
 	PullLong  string = `
   The 'pull' command allows you to download or build a container from a given
   URI.  Supported URIs include:
 
   library: Pull an image from the currently configured library
-      library://[user[collection/[container[:tag]]]]
+      library://user/collection/container[:tag]
 
   docker: Pull an image from Docker Hub
       docker://user/image:tag
@@ -583,11 +562,13 @@ Enterprise Performance Computing (EPC)`
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// push
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	PushUse   string = `push [push options...] <container image> library://[user[collection/[container[:tag]]]]`
-	PushShort string = `Push a container to a Library URI`
+	PushUse   string = `push [push options...] <image> library://user/collection/container[:tag]`
+	PushShort string = `Upload image to the provided library (default is "cloud.sylabs.io")`
 	PushLong  string = `
   The Singularity push command allows you to upload your sif image to a library
-  of your choosing`
+  of your choosing. It's always good practice to sign your containers before
+  pushing them to the library. An auth token is required to push to the remote,
+  so you may need to configure if first with 'singularity remote'.`
 	PushExample string = `
   $ singularity push /home/user/my.sif library://user/collection/my.sif:latest`
 
@@ -595,11 +576,11 @@ Enterprise Performance Computing (EPC)`
 	// search
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	SearchUse   string = `search [search options...] <search query>`
-	SearchShort string = `Search the library`
+	SearchShort string = `Search a Library for images`
 	SearchLong  string = `
   The Singularity search command allows you to search within a container library 
-  of your choosing.  The container library defaults to 
-  https://library.sylabs.io when no other library argument is given.`
+  of your choosing.  The container library defaults to cloud.sylabs.io when no 
+  other library argument is given.`
 	SearchExample string = `
   $ singularity search lolcow`
 
@@ -607,7 +588,7 @@ Enterprise Performance Computing (EPC)`
 	// run
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	RunUse   string = `run [run options...] <container>`
-	RunShort string = `Launch a runscript within container`
+	RunShort string = `Run the user-defined default command within a container`
 	RunLong  string = `
   This command will launch a Singularity container and execute a runscript
   if one is defined for that container. The runscript is a metadata file within
@@ -634,7 +615,7 @@ Enterprise Performance Computing (EPC)`
 	// shell
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	ShellUse   string = `shell [shell options...] <container>`
-	ShellShort string = `Run a Bourne shell within container`
+	ShellShort string = `Run a shell within a container`
 	ShellLong  string = `
   singularity shell supports the following formats:` + formats
 	ShellExamples string = `
@@ -667,7 +648,7 @@ Enterprise Performance Computing (EPC)`
 	// sign
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	SignUse   string = `sign [sign options...] <image path>`
-	SignShort string = `Attach cryptographic signatures to container`
+	SignShort string = `Attach a cryptographic signature to an image`
 	SignLong  string = `
   The sign command allows a user to create a cryptographic signature on either a 
   single data object or a list of data objects within the same SIF group. By 
@@ -680,7 +661,7 @@ Enterprise Performance Computing (EPC)`
 	// verify
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	VerifyUse   string = `verify [verify options...] <image path>`
-	VerifyShort string = `Verify cryptographic signatures on container`
+	VerifyShort string = `Verify cryptographic signatures attached to an image`
 	VerifyLong  string = `
   The verify command allows a user to verify cryptographic signatures on SIF 
   container files. There may be multiple signatures for data objects and 
@@ -690,14 +671,17 @@ Enterprise Performance Computing (EPC)`
   signature verification is done for all those blocks.`
 	VerifyExample string = `
   $ singularity verify container.sif`
+
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// Run-help
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	RunHelpUse   string = `run-help <image path>`
-	RunHelpShort string = `Display help for container if available`
+	RunHelpShort string = `Show the user-defined help for an image`
 	RunHelpLong  string = `
-  The 'run-help' command will display a help text file for a container if 
-  available.`
+  Show the help for an image.
+
+  The help text is from the '%help' section of the definition file. If you are using the '--apps' option,
+  the help text is instead from that app's '%apphelp' section.`
 	RunHelpExample string = `
   $ cat my_container.def
   Bootstrap: docker
@@ -706,6 +690,9 @@ Enterprise Performance Computing (EPC)`
   %help
       Some help for this container
 
+  %apphelp foo
+      Some help for application 'foo' in this container
+
   $ sudo singularity build my_container.sif my_container.def
   Using container recipe deffile: my_container.def
   [...snip...]
@@ -713,12 +700,16 @@ Enterprise Performance Computing (EPC)`
 
   $ singularity run-help my_container.sif
 
-    Some help for this container`
+    Some help for this container
+
+  $ singularity run-help --app foo my_container.sif
+
+    Some help for application in this container`
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// Inspect
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	InspectUse   string = `inspect [inspect options...] <image path>`
-	InspectShort string = `Display metadata for container if available`
+	InspectShort string = `Show metadata for an image`
 	InspectLong  string = `
   Inspect will show you labels, environment variables, and scripts associated 
   with the image determined by the flags you pass.`
@@ -770,7 +761,7 @@ found at:
 	// Test
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	RunTestUse   string = `test [exec options...] <image path>`
-	RunTestShort string = `Run defined tests for this particular container`
+	RunTestShort string = `Run the user-defined tests within a container`
 	RunTestLong  string = `
   The 'test' command allows you to execute a testscript (if available) inside of
   a given container 
@@ -798,7 +789,7 @@ found at:
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	// OCI
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-	OciUse   string = `oci <subcommand>`
+	OciUse   string = `oci`
 	OciShort string = `Manage OCI containers`
 	OciLong  string = `
   Allow you to manage containers from OCI bundle directories.
@@ -810,7 +801,7 @@ found at:
   $ singularity oci create -b ~/bundle mycontainer
   $ singularity oci start mycontainer`
 
-	OciCreateUse   string = `create [create options...] <container_ID>`
+	OciCreateUse   string = `create -b <bundle_path> [create options...] <container_ID>`
 	OciCreateShort string = `Create a container from a bundle directory (root user only)`
 	OciCreateLong  string = `
   Create invoke create operation to create a container instance from an OCI bundle directory`
@@ -831,7 +822,7 @@ found at:
 	OciStateExample string = `
   $ singularity oci state mycontainer`
 
-	OciKillUse   string = `kill <container_ID> [-s] signal`
+	OciKillUse   string = `kill [kill options...] <container_ID>`
 	OciKillShort string = `Kill a container (root user only)`
 	OciKillLong  string = `
   Kill invoke kill operation to kill processes running within container identified by container ID.`
@@ -860,7 +851,7 @@ found at:
 	OciExecExample string = `
   $ singularity oci exec mycontainer id`
 
-	OciRunUse   string = `run [run options...] <container_ID>`
+	OciRunUse   string = `run -b <bundle_path> [run options...] <container_ID>`
 	OciRunShort string = `Create/start/attach/delete a container from a bundle directory (root user only)`
 	OciRunLong  string = `
   Run will invoke equivalent of create/start/attach/delete commands in a row.`

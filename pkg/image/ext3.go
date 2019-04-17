@@ -57,7 +57,7 @@ func CheckExt3Header(b []byte) (uint64, error) {
 	if err := binary.Read(buffer, binary.LittleEndian, einfo); err != nil {
 		return offset, fmt.Errorf("can't read the top of the image")
 	}
-	if bytes.Compare(einfo.Magic[:], []byte(extMagic)) != 0 {
+	if !bytes.Equal(einfo.Magic[:], []byte(extMagic)) {
 		return offset, fmt.Errorf(notValidExt3ImageMessage)
 	}
 	if einfo.Compat&compatHasJournal == 0 {
@@ -86,10 +86,14 @@ func (f *ext3Format) initializer(img *Image, fileinfo os.FileInfo) error {
 		return err
 	}
 	img.Type = EXT3
-	img.Partitions[0].Offset = offset
-	img.Partitions[0].Size = uint64(fileinfo.Size()) - offset
-	img.Partitions[0].Type = EXT3
-	img.Partitions[0].Name = RootFs
+	img.Partitions = []Section{
+		{
+			Offset: offset,
+			Size:   uint64(fileinfo.Size()) - offset,
+			Type:   EXT3,
+			Name:   RootFs,
+		},
+	}
 	return nil
 }
 

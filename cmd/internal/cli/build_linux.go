@@ -7,18 +7,17 @@ package cli
 
 import (
 	"context"
+	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/sylabs/singularity/internal/pkg/build"
 	"github.com/sylabs/singularity/internal/pkg/build/remotebuilder"
+	scs "github.com/sylabs/singularity/internal/pkg/remote"
 	"github.com/sylabs/singularity/internal/pkg/sylog"
 	"github.com/sylabs/singularity/pkg/build/types"
 )
-
-func preRun(cmd *cobra.Command, args []string) {
-	sylabsToken(cmd, args)
-}
 
 func run(cmd *cobra.Command, args []string) {
 	buildFormat := "sif"
@@ -39,12 +38,54 @@ func run(cmd *cobra.Command, args []string) {
 
 		// Submiting a remote build requires a valid authToken
 		if authToken == "" {
-			sylog.Fatalf("Unable to submit build job: %v", authWarning)
+			sylog.Fatalf("Unable to submit build job: %v", remoteWarning)
 		}
 
 		def, err := definitionFromSpec(spec)
 		if err != nil {
 			sylog.Fatalf("Unable to build from %s: %v", spec, err)
+		}
+
+		if sandbox {
+			// create temporary file to download sif
+			f, err := ioutil.TempFile(tmpDir, "remote-build-")
+			if err != nil {
+				sylog.Fatalf("Could not create temporary directory: %s", err)
+			}
+			os.Remove(f.Name())
+			dest = f.Name()
+
+			// remove downloaded sif
+			defer os.Remove(f.Name())
+
+			// build from sif downloaded in tmp location
+			defer func() {
+				sylog.Debugf("Building sandbox from downloaded SIF")
+				d, err := types.NewDefinitionFromURI("localimage" + "://" + dest)
+				if err != nil {
+					sylog.Fatalf("Unable to create definition for sandbox build: %v", err)
+				}
+
+				b, err := build.New(
+					[]types.Definition{d},
+					build.Config{
+						Dest:      args[0],
+						Format:    buildFormat,
+						NoCleanUp: noCleanUp,
+						Opts: types.Options{
+							TmpDir: tmpDir,
+							Update: update,
+							Force:  force,
+						},
+					})
+				if err != nil {
+					sylog.Fatalf("Unable to create build: %v", err)
+				}
+
+				if err = b.Full(); err != nil {
+					sylog.Fatalf("While performing build: %v", err)
+				}
+			}()
 		}
 
 		b, err := remotebuilder.New(dest, libraryURL, def, detached, force, builderURL, authToken)
@@ -67,31 +108,36 @@ func run(cmd *cobra.Command, args []string) {
 		}
 
 		// parse definition to determine build source
-		def, err := build.MakeDef(spec, false)
+		defs, err := build.MakeAllDefs(spec, false)
 		if err != nil {
 			sylog.Fatalf("Unable to build from %s: %v", spec, err)
 		}
 
-		// only resolve remote endpoints if library is the build source
-		if def.Header["bootstrap"] == "library" {
-			handleBuildFlags(cmd)
+		// only resolve remote endpoints if library is a build source
+		for _, d := range defs {
+			if d.Header != nil && d.Header["bootstrap"] == "library" {
+				handleBuildFlags(cmd)
+				continue
+			}
 		}
 
-		b, err := build.NewBuild(
-			spec,
-			dest,
-			buildFormat,
-			libraryURL,
-			authToken,
-			types.Options{
-				TmpDir:           tmpDir,
-				Update:           update,
-				Force:            force,
-				Sections:         sections,
-				NoTest:           noTest,
-				NoHTTPS:          noHTTPS,
-				NoCleanUp:        noCleanUp,
-				DockerAuthConfig: authConf,
+		b, err := build.New(
+			defs,
+			build.Config{
+				Dest:      dest,
+				Format:    buildFormat,
+				NoCleanUp: noCleanUp,
+				Opts: types.Options{
+					TmpDir:           tmpDir,
+					Update:           update,
+					Force:            force,
+					Sections:         sections,
+					NoTest:           noTest,
+					NoHTTPS:          noHTTPS,
+					LibraryURL:       libraryURL,
+					LibraryAuthToken: authToken,
+					DockerAuthConfig: authConf,
+				},
 			})
 		if err != nil {
 			sylog.Fatalf("Unable to create build: %v", err)
@@ -99,6 +145,50 @@ func run(cmd *cobra.Command, args []string) {
 
 		if err = b.Full(); err != nil {
 			sylog.Fatalf("While performing build: %v", err)
+		}
+	}
+}
+
+func checkSections() error {
+	var all, none bool
+	for _, section := range sections {
+		if section == "none" {
+			none = true
+		}
+		if section == "all" {
+			all = true
+		}
+	}
+
+	if all && len(sections) > 1 {
+		return fmt.Errorf("Section specification error: Cannot have all and any other option")
+	}
+	if none && len(sections) > 1 {
+		return fmt.Errorf("Section specification error: Cannot have none and any other option")
+	}
+
+	return nil
+}
+
+// standard builds should just warn and fall back to CLI default if we cannot resolve library URL
+func handleBuildFlags(cmd *cobra.Command) {
+	// if we can load config and if default endpoint is set, use that
+	// otherwise fall back on regular authtoken and URI behavior
+	endpoint, err := sylabsRemote(remoteConfig)
+	if err == scs.ErrNoDefault {
+		sylog.Warningf("No default remote in use, falling back to %v", libraryURL)
+		return
+	} else if err != nil {
+		sylog.Fatalf("Unable to load remote configuration: %v", err)
+	}
+
+	authToken = endpoint.Token
+	if !cmd.Flags().Lookup("library").Changed {
+		uri, err := endpoint.GetServiceURI("library")
+		if err == nil {
+			libraryURL = uri
+		} else {
+			sylog.Warningf("Unable to get library service URI: %v", err)
 		}
 	}
 }

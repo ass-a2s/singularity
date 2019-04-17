@@ -7,22 +7,13 @@ package remote
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"reflect"
 	"testing"
 
 	useragent "github.com/sylabs/singularity/pkg/util/user-agent"
 )
-
-var remoteConfig = Config{
-	DefaultRemote: "",
-	Remotes: map[string]*EndPoint{
-		"cloud": {
-			URI:   "cloud.sylabs.io",
-			Token: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.TCYt5XsITJX1CxPCT8yAV-TVkIEq_PbChOMqsLfRoPsnsgw5WEuts01mq-pQy7UJiN5mgRxD-WUcX16dUEMGlv50aqzpqh4Qktb3rk-BuQy72IFLOqV0G_zS245-kronKb78cPN25DGlcTwLtjPAYuNzVBAh4vGHSrQyHUdBBPM",
-		},
-	},
-}
 
 //NOTE: VerifyToken() cannot be tested unless we have a dummy token for the token service to authenticate
 
@@ -92,6 +83,256 @@ func TestWriteToReadFrom(t *testing.T) {
 
 	})
 
+}
+
+type syncTest struct {
+	name string
+	sys  Config // sys Input
+	usr  Config // usr Input
+	res  Config // res Output
+}
+
+func TestSyncFrom(t *testing.T) {
+	testsPass := []syncTest{
+		{
+			name: "empty sys config",
+			usr: Config{
+				Remotes: map[string]*EndPoint{
+					"sylabs": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token",
+					},
+				},
+			},
+			res: Config{
+				Remotes: map[string]*EndPoint{
+					"sylabs": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token",
+					},
+				},
+			},
+		}, {
+			name: "sys config new endpoint",
+			sys: Config{
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token", // should be ignored by SyncFrom
+					},
+				},
+			},
+			usr: Config{
+				Remotes: map[string]*EndPoint{
+					"sylabs": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token",
+					},
+				},
+			},
+			res: Config{
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:    "cloud.sylabs.io",
+						System: true,
+					},
+					"sylabs": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token",
+					},
+				},
+			},
+		}, {
+			name: "sys config existing endpoint",
+			sys: Config{
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token", // should be ignored by SyncFrom
+					},
+				},
+			},
+			usr: Config{
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:    "cloud.sylabs.io",
+						System: true,
+					},
+					"sylabs": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token",
+					},
+				},
+			},
+			res: Config{
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:    "cloud.sylabs.io",
+						System: true,
+					},
+					"sylabs": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token",
+					},
+				},
+			},
+		}, {
+			name: "sys config update existing endpoint",
+			sys: Config{
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token", // should be ignored by SyncFrom
+					},
+				},
+			},
+			usr: Config{
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:    "cloud.old-url.io",
+						System: true,
+					},
+					"sylabs": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token",
+					},
+				},
+			},
+			res: Config{
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:    "cloud.sylabs.io",
+						System: true,
+					},
+					"sylabs": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token",
+					},
+				},
+			},
+		}, {
+			name: "sys config update default endpoint",
+			sys: Config{
+				DefaultRemote: "sylabs-global",
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token", // should be ignored by SyncFrom
+					},
+				},
+			},
+			usr: Config{
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:    "cloud.old-url.io",
+						System: true,
+					},
+					"sylabs": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token",
+					},
+				},
+			},
+			res: Config{
+				DefaultRemote: "sylabs-global",
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:    "cloud.sylabs.io",
+						System: true,
+					},
+					"sylabs": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token",
+					},
+				},
+			},
+		}, {
+			name: "sys config dont update default endpoint",
+			sys: Config{
+				DefaultRemote: "sylabs-global",
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token", // should be ignored by SyncFrom
+					},
+				},
+			},
+			usr: Config{
+				DefaultRemote: "sylabs",
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:    "cloud.old-url.io",
+						System: true,
+					},
+					"sylabs": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token",
+					},
+				},
+			},
+			res: Config{
+				DefaultRemote: "sylabs",
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:    "cloud.sylabs.io",
+						System: true,
+					},
+					"sylabs": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token",
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range testsPass {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.usr.SyncFrom(&test.sys); err != nil {
+				t.Error("failed to sync from sys")
+			}
+
+			fmt.Println(test.usr)
+			fmt.Println(test.res)
+
+			if !reflect.DeepEqual(test.usr, test.res) {
+				t.Errorf("incorrect result Config")
+			}
+		})
+	}
+
+	testsFail := []syncTest{
+		{
+			name: "sys endpoint collision",
+			sys: Config{
+				Remotes: map[string]*EndPoint{
+					"sylabs-global": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token",
+					},
+				},
+			},
+			usr: Config{
+				Remotes: map[string]*EndPoint{
+					"sylabs": {
+						URI:   "cloud.sylabs.io",
+						Token: "fake-token",
+					},
+					"sylabs-global": {
+						URI: "cloud.sylabs.io",
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range testsFail {
+		t.Run(test.name, func(t *testing.T) {
+			if err := test.usr.SyncFrom(&test.sys); err == nil {
+				t.Error("unexpected success calling SyncFrom")
+			}
+		})
+	}
 }
 
 type remoteTest struct {
@@ -216,6 +457,32 @@ func TestRemoveRemote(t *testing.T) {
 			name: "remove remote to make non-empty config",
 			old: Config{
 				DefaultRemote: "",
+				Remotes: map[string]*EndPoint{
+					"random": {
+						URI:   "cloud.random.io",
+						Token: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.TCYt5XsITJX1CxPCT8yAV-TVkIEq_PbChOMqsLfRoPsnsgw5WEuts01mq-pQy7UJiN5mgRxD-WUcX16dUEMGlv50aqzpqh4Qktb3rk-BuQy72IFLOqV0G_zS245-kronKb78cPN25DGlcTwLtjPAYuNzVBAh4vGHSrQyHUdBBPM",
+					},
+					"cloud": {
+						URI:   "cloud.sylabs.io",
+						Token: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.TCYt5XsITJX1CxPCT8yAV-TVkIEq_PbChOMqsLfRoPsnsgw5WEuts01mq-pQy7UJiN5mgRxD-WUcX16dUEMGlv50aqzpqh4Qktb3rk-BuQy72IFLOqV0G_zS245-kronKb78cPN25DGlcTwLtjPAYuNzVBAh4vGHSrQyHUdBBPM",
+					},
+				},
+			},
+			new: Config{
+				DefaultRemote: "",
+				Remotes: map[string]*EndPoint{
+					"random": {
+						URI:   "cloud.random.io",
+						Token: "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.TCYt5XsITJX1CxPCT8yAV-TVkIEq_PbChOMqsLfRoPsnsgw5WEuts01mq-pQy7UJiN5mgRxD-WUcX16dUEMGlv50aqzpqh4Qktb3rk-BuQy72IFLOqV0G_zS245-kronKb78cPN25DGlcTwLtjPAYuNzVBAh4vGHSrQyHUdBBPM",
+					},
+				},
+			},
+			id: "cloud",
+		},
+		{
+			name: "remove default remote to make defaultless config",
+			old: Config{
+				DefaultRemote: "cloud",
 				Remotes: map[string]*EndPoint{
 					"random": {
 						URI:   "cloud.random.io",

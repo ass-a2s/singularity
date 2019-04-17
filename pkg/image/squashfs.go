@@ -55,7 +55,7 @@ func CheckSquashfsHeader(b []byte) (uint64, error) {
 	if err := binary.Read(buffer, binary.LittleEndian, sinfo); err != nil {
 		return offset, fmt.Errorf("can't read the top of the image")
 	}
-	if bytes.Compare(sinfo.Magic[:], []byte(squashfsMagic)) != 0 {
+	if !bytes.Equal(sinfo.Magic[:], []byte(squashfsMagic)) {
 		return offset, fmt.Errorf("not a valid squashfs image")
 	}
 
@@ -89,10 +89,14 @@ func (f *squashfsFormat) initializer(img *Image, fileinfo os.FileInfo) error {
 		return err
 	}
 	img.Type = SQUASHFS
-	img.Partitions[0].Offset = offset
-	img.Partitions[0].Size = uint64(fileinfo.Size()) - offset
-	img.Partitions[0].Type = SQUASHFS
-	img.Partitions[0].Name = RootFs
+	img.Partitions = []Section{
+		{
+			Offset: offset,
+			Size:   uint64(fileinfo.Size()) - offset,
+			Type:   SQUASHFS,
+			Name:   RootFs,
+		},
+	}
 
 	if img.Writable {
 		sylog.Warningf("squashfs is not a writable filesystem")

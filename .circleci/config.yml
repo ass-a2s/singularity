@@ -15,19 +15,6 @@ jobs:
           paths:
             - src/github.com/sylabs/singularity
 
-  go1.10-stretch:
-    <<: *defaults
-    docker:
-      - image: sylabsio/golang:1.10-stretch
-    steps:
-      - attach_workspace:
-          at: /go
-      - run:
-          name: Build Singularity
-          command: |-
-            ./mconfig -p /usr/local
-            make -j$(nproc) -C ./builddir all
-
   go1.11-stretch:
     <<: *defaults
     docker:
@@ -38,13 +25,12 @@ jobs:
       - run:
           name: Build Singularity
           command: |-
-            ./mconfig -p /usr/local
+            ./mconfig -v -p /usr/local
             make -j$(nproc) -C ./builddir all
       - run:
           name: Check code
           command: |-
-            go get -u golang.org/x/lint/golint
-            make -j$(nproc) -C ./builddir check
+            make -j$(nproc) -C ./builddir vendor-check check
 
   go1.11-alpine:
     <<: *defaults
@@ -56,15 +42,38 @@ jobs:
       - run:
           name: Build Singularity
           command: |-
-            ./mconfig -p /usr/local
+            ./mconfig -v -p /usr/local
             make -j$(nproc) -C ./builddir all
       - run:
           name: Check code
           command: |-
-            go get -u golang.org/x/lint/golint
-            make -j$(nproc) -C ./builddir check
+            make -j$(nproc) -C ./builddir vendor-check check
 
-  singularity_test:
+  go1.11-macos:
+    macos:
+      xcode: "10.2.0"
+    working_directory: /Users/distiller/go/src/github.com/sylabs/singularity
+    steps:
+      - checkout
+      - run:
+          name: Setup environment
+          command: |-
+            echo 'export GOPATH=$HOME/go'        >> $BASH_ENV
+            echo 'export PATH=$GOPATH/bin:$PATH' >> $BASH_ENV
+      - run:
+          name: Install dependencies
+          command: brew install go
+      - run:
+          name: Build Singularity
+          command: |-
+            ./mconfig -v -p /usr/local
+            make -j$(sysctl -n hw.logicalcpu) -C ./builddir all
+      - run:
+          name: Check code
+          command: |-
+            make -j$(sysctl -n hw.logicalcpu) -C ./builddir vendor-check check
+
+  unit_tests:
     machine: true
     steps:
       - attach_workspace:
@@ -72,53 +81,107 @@ jobs:
       - run:
           name: Setup environment
           command: |-
-            echo 'export  GOPATH=$HOME/go' >> $BASH_ENV
-            echo 'export  GOROOT=/usr/local/go' >> $BASH_ENV
-            echo 'export  GOBIN=$HOME/go/bin' >> $BASH_ENV
-            echo 'export  GOCACHE=off' >> $BASH_ENV
+            echo 'export GOPATH=$HOME/go' >> $BASH_ENV
+            echo 'export GOROOT=/usr/local/go' >> $BASH_ENV
+            echo 'export GOBIN=$HOME/go/bin' >> $BASH_ENV
             echo 'export PATH=$GOPATH/bin:$GOBIN:$GOROOT/bin:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin' >> $BASH_ENV
       - run:
-          name: Update Go to 1.11
+          name: Update Go to 1.11.6
           working_directory: /tmp
           command: |-
-            wget https://dl.google.com/go/go1.11.linux-amd64.tar.gz
+            wget https://dl.google.com/go/go1.11.6.linux-amd64.tar.gz
             sudo rm -rf /usr/local/go
-            sudo tar -C /usr/local -xzf go1.11.linux-amd64.tar.gz
+            sudo tar -C /usr/local -xzf go1.11.6.linux-amd64.tar.gz
+            sudo ln -s /usr/local/go/bin/go /usr/local/bin/go
             sudo chown -R circleci:circleci ~/go
+      - run:
+         name: Wait until apt completion
+         command: |-
+           i=0 ; while fuser /var/lib/dpkg/lock > /dev/null 2>&1 ; do echo 'Waiting for dpkg lock...' ; let i=i+1 ; if test $i -ge 30 ; then echo 'Waiting for too long. Abort.' ; exit 1 ; fi ; sleep 1 ; done
       - run:
           name: Fetch deps
           working_directory: /tmp
           command: |-
             mkdir -p ${GOBIN}
-            curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
             sudo apt-get update -y && sudo apt-get install -y build-essential libssl-dev uuid-dev libgpgme11-dev squashfs-tools libseccomp-dev
       - run:
-          name: Build & install singularity
+          name: Build and Install Singularity
           command: |-
             cd $HOME/go/src/github.com/sylabs/singularity
-            ./mconfig -p /usr/local
+            ./mconfig -v -p /usr/local --without-network
             make -j$(nproc) -C ./builddir all
             sudo make -C ./builddir install
       - run:
-          name: Test singularity
+          name: Run unit tests
           command: |-
             cd $HOME/go/src/github.com/sylabs/singularity
-            make -C ./builddir test
+            make -j$(nproc) -C ./builddir unit-test
+
+  e2e_tests:
+    machine: true
+    steps:
+      - attach_workspace:
+          at: ~/go
+      - run:
+          name: Setup environment
+          command: |-
+            echo 'export GOPATH=$HOME/go' >> $BASH_ENV
+            echo 'export GOROOT=/usr/local/go' >> $BASH_ENV
+            echo 'export GOBIN=$HOME/go/bin' >> $BASH_ENV
+            echo 'export SINGULARITY_E2E=1' >> $BASH_ENV
+            echo 'export PATH=$GOPATH/bin:$GOBIN:$GOROOT/bin:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin' >> $BASH_ENV
+      - run:
+          name: Update Go to 1.11.6
+          working_directory: /tmp
+          command: |-
+            wget https://dl.google.com/go/go1.11.6.linux-amd64.tar.gz
+            sudo rm -rf /usr/local/go
+            sudo tar -C /usr/local -xzf go1.11.6.linux-amd64.tar.gz
+            sudo ln -s /usr/local/go/bin/go /usr/local/bin/go
+            sudo chown -R circleci:circleci ~/go
+      - run:
+         name: Wait until apt completion
+         command: |-
+           i=0 ; while fuser /var/lib/dpkg/lock > /dev/null 2>&1 ; do echo 'Waiting for dpkg lock...' ; let i=i+1 ; if test $i -ge 30 ; then echo 'Waiting for too long. Abort.' ; exit 1 ; fi ; sleep 1 ; done
+      - run:
+          name: Fetch deps
+          working_directory: /tmp
+          command: |-
+            mkdir -p ${GOBIN}
+            sudo apt-get update -y && sudo apt-get install -y build-essential libssl-dev uuid-dev libgpgme11-dev squashfs-tools libseccomp-dev
+      - run:
+          name: Build and Install singularity
+          command: |-
+            cd $HOME/go/src/github.com/sylabs/singularity
+            ./mconfig -v -p /usr/local
+            make -j$(nproc) -C ./builddir all
+            sudo make -C ./builddir install
+      - run:
+          name: Run E2E tests
+          command: |-
+            cd $HOME/go/src/github.com/sylabs/singularity
+            make -C ./builddir e2e-tests
 
 workflows:
   version: 2
-  test-compile:
+  build_and_test:
     jobs:
       - get_source
-      - go1.10-stretch:
-          requires:
-            - get_source
       - go1.11-stretch:
           requires:
             - get_source
       - go1.11-alpine:
           requires:
             - get_source
-      - singularity_test:
+      - go1.11-macos:
           requires:
             - get_source
+      - unit_tests:
+          requires:
+            - get_source
+      - e2e_tests:
+          requires:
+            - get_source
+          filters:
+            branches:
+              only: master

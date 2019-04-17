@@ -24,6 +24,11 @@ var (
 	ErrNoDefault = errors.New("no default remote")
 )
 
+var errorCodeMap = map[int]string{
+	404: "Invalid Token",
+	500: "Internal Server Error",
+}
+
 // Config stores the state of remote endpoint configurations
 type Config struct {
 	DefaultRemote string               `yaml:"Active"`
@@ -32,8 +37,9 @@ type Config struct {
 
 // EndPoint descriptes a single remote service
 type EndPoint struct {
-	URI   string `yaml:"URI,omitempty"`
-	Token string `yaml:"Token,omitempty"`
+	URI    string `yaml:"URI,omitempty"`
+	Token  string `yaml:"Token,omitempty"`
+	System bool   `yaml:"System"` // Was this EndPoint set from system config file
 }
 
 // ReadFrom reads remote configuration from io.Reader
@@ -74,6 +80,38 @@ func (c *Config) WriteTo(w io.Writer) (int64, error) {
 	return int64(n), err
 }
 
+// SyncFrom updates c with the remotes specified in sys. Typically, this is used
+// to sync a globally-configured remote.Config into a user-specific remote.Config.
+// Currently, SyncFrom will return a name-collision error if there is an EndPoint
+// name which exists in both c & sys, and the EndPoint in c has System == false.
+func (c *Config) SyncFrom(sys *Config) error {
+	for name, eSys := range sys.Remotes {
+		eUsr, err := c.GetRemote(name)
+		if err == nil && !eUsr.System { // usr & sys name collision
+			return fmt.Errorf("name collision while syncing: %s", name)
+		} else if err == nil {
+			eUsr.URI = eSys.URI // update URI just in case
+			continue
+		}
+
+		e := &EndPoint{
+			URI:    eSys.URI,
+			System: true,
+		}
+
+		if err := c.Add(name, e); err != nil {
+			return err
+		}
+	}
+
+	// set system default to user default if no user default specified
+	if c.DefaultRemote == "" && sys.DefaultRemote != "" {
+		c.DefaultRemote = sys.DefaultRemote
+	}
+
+	return nil
+}
+
 // SetDefault sets default remote endpoint or returns an error if it does not exist
 func (c *Config) SetDefault(name string) error {
 	if _, ok := c.Remotes[name]; !ok {
@@ -109,10 +147,15 @@ func (c *Config) Add(name string, e *EndPoint) error {
 }
 
 // Remove a remote endpoint
+// if endpoint is the default, the default is cleared
 // returns an error if it does not exist
 func (c *Config) Remove(name string) error {
 	if _, ok := c.Remotes[name]; !ok {
 		return fmt.Errorf("%s is not a remote", name)
+	}
+
+	if c.DefaultRemote == name {
+		c.DefaultRemote = ""
 	}
 
 	delete(c.Remotes, name)
@@ -174,7 +217,11 @@ func (e *EndPoint) VerifyToken() error {
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("error response from server: %v", res.StatusCode)
+		convStatus, ok := errorCodeMap[res.StatusCode]
+		if !ok {
+			convStatus = "Unknown"
+		}
+		return fmt.Errorf("error response from server: %v", convStatus)
 	}
 
 	return nil

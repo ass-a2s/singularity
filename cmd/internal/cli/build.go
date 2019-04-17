@@ -13,12 +13,11 @@ import (
 
 	ocitypes "github.com/containers/image/types"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"github.com/sylabs/singularity/docs"
 	scs "github.com/sylabs/singularity/internal/pkg/remote"
 	"github.com/sylabs/singularity/internal/pkg/sylog"
-	"github.com/sylabs/singularity/pkg/build/types"
-	"github.com/sylabs/singularity/pkg/build/types/parser"
+	legacytypes "github.com/sylabs/singularity/pkg/build/legacy"
+	legacyparser "github.com/sylabs/singularity/pkg/build/legacy/parser"
 	"github.com/sylabs/singularity/pkg/sypgp"
 )
 
@@ -29,7 +28,6 @@ var (
 	libraryURL     string
 	isJSON         bool
 	sandbox        bool
-	writable       bool
 	force          bool
 	update         bool
 	noTest         bool
@@ -41,8 +39,6 @@ var (
 	dockerLogin    bool
 	noCleanUp      bool
 )
-
-var buildflags = pflag.NewFlagSet("BuildFlags", pflag.ExitOnError)
 
 func init() {
 	BuildCmd.Flags().SetInterspersed(false)
@@ -71,7 +67,7 @@ func init() {
 	BuildCmd.Flags().BoolVarP(&detached, "detached", "d", false, "submit build job and print build ID (no real-time logs and requires --remote)")
 	BuildCmd.Flags().SetAnnotation("detached", "envkey", []string{"DETACHED"})
 
-	BuildCmd.Flags().StringVar(&builderURL, "builder", "https://build.sylabs.io", "remote Build Service URL")
+	BuildCmd.Flags().StringVar(&builderURL, "builder", "https://build.sylabs.io", "remote Build Service URL, setting this implies --remote")
 	BuildCmd.Flags().SetAnnotation("builder", "envkey", []string{"BUILDER"})
 
 	BuildCmd.Flags().StringVar(&libraryURL, "library", "https://library.sylabs.io", "container Library URL")
@@ -107,6 +103,15 @@ var BuildCmd = &cobra.Command{
 	TraverseChildren: true,
 }
 
+func preRun(cmd *cobra.Command, args []string) {
+	// Always perform remote build when builder flag is set
+	if cmd.Flags().Lookup("builder").Changed {
+		cmd.Flags().Lookup("remote").Value.Set("true")
+	}
+
+	sylabsToken(cmd, args)
+}
+
 // checkTargetCollision makes sure output target doesn't exist, or is ok to overwrite
 func checkBuildTarget(path string, update bool) bool {
 	if f, err := os.Stat(path); err == nil {
@@ -131,38 +136,19 @@ func checkBuildTarget(path string, update bool) bool {
 	return true
 }
 
-func checkSections() error {
-	var all, none bool
-	for _, section := range sections {
-		if section == "none" {
-			none = true
-		}
-		if section == "all" {
-			all = true
-		}
-	}
-
-	if all && len(sections) > 1 {
-		return fmt.Errorf("Section specification error: Cannot have all and any other option")
-	}
-	if none && len(sections) > 1 {
-		return fmt.Errorf("Section specification error: Cannot have none and any other option")
-	}
-
-	return nil
-}
-
-func definitionFromSpec(spec string) (def types.Definition, err error) {
+// definitionFromSpec is specifically for parsing specs for the remote builder
+// it uses a different version the the definition struct and parser
+func definitionFromSpec(spec string) (def legacytypes.Definition, err error) {
 
 	// Try spec as URI first
-	def, err = types.NewDefinitionFromURI(spec)
+	def, err = legacytypes.NewDefinitionFromURI(spec)
 	if err == nil {
 		return
 	}
 
 	// Try spec as local file
 	var isValid bool
-	isValid, err = parser.IsValidDefinition(spec)
+	isValid, err = legacyparser.IsValidDefinition(spec)
 	if err != nil {
 		return
 	}
@@ -177,14 +163,14 @@ func definitionFromSpec(spec string) (def types.Definition, err error) {
 		}
 
 		defer defFile.Close()
-		def, err = parser.ParseDefinitionFile(defFile)
+		def, err = legacyparser.ParseDefinitionFile(defFile)
 
 		return
 	}
 
 	// File exists and does NOT contain a valid definition
 	// local image or sandbox
-	def = types.Definition{
+	def = legacytypes.Definition{
 		Header: map[string]string{
 			"bootstrap": "localimage",
 			"from":      spec,
@@ -230,7 +216,7 @@ func makeDockerCredentials(cmd *cobra.Command) (authConf *ocitypes.DockerAuthCon
 func handleRemoteBuildFlags(cmd *cobra.Command) {
 	// if we can load config and if default endpoint is set, use that
 	// otherwise fall back on regular authtoken and URI behavior
-	e, err := sylabsRemote(remoteConfig)
+	endpoint, err := sylabsRemote(remoteConfig)
 	if err == scs.ErrNoDefault {
 		sylog.Warningf("No default remote in use, falling back to CLI defaults")
 		return
@@ -238,42 +224,19 @@ func handleRemoteBuildFlags(cmd *cobra.Command) {
 		sylog.Fatalf("Unable to load remote configuration: %v", err)
 	}
 
-	authToken = e.Token
+	authToken = endpoint.Token
 	if !cmd.Flags().Lookup("builder").Changed {
-		uri, err := e.GetServiceURI("builder")
+		uri, err := endpoint.GetServiceURI("builder")
 		if err != nil {
 			sylog.Fatalf("Unable to get build service URI: %v", err)
 		}
 		builderURL = uri
 	}
 	if !cmd.Flags().Lookup("library").Changed {
-		uri, err := e.GetServiceURI("library")
+		uri, err := endpoint.GetServiceURI("library")
 		if err != nil {
 			sylog.Fatalf("Unable to get library service URI: %v", err)
 		}
 		libraryURL = uri
-	}
-}
-
-// standard builds should just warn and fall back to CLI default if we cannot resolve library URL
-func handleBuildFlags(cmd *cobra.Command) {
-	// if we can load config and if default endpoint is set, use that
-	// otherwise fall back on regular authtoken and URI behavior
-	e, err := sylabsRemote(remoteConfig)
-	if err == scs.ErrNoDefault {
-		sylog.Warningf("No default remote in use, falling back to %v", libraryURL)
-		return
-	} else if err != nil {
-		sylog.Fatalf("Unable to load remote configuration: %v", err)
-	}
-
-	authToken = e.Token
-	if !cmd.Flags().Lookup("library").Changed {
-		uri, err := e.GetServiceURI("library")
-		if err == nil {
-			libraryURL = uri
-		} else if err != nil {
-			sylog.Warningf("Unable to get library service URI: %v", err)
-		}
 	}
 }

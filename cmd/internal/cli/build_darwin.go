@@ -14,10 +14,6 @@ import (
 	"github.com/sylabs/singularity/internal/pkg/sylog"
 )
 
-func preRun(cmd *cobra.Command, args []string) {
-	sylabsToken(cmd, args)
-}
-
 func run(cmd *cobra.Command, args []string) {
 	dest := args[0]
 	spec := args[1]
@@ -35,7 +31,7 @@ func run(cmd *cobra.Command, args []string) {
 
 	// Submiting a remote build requires a valid authToken
 	if authToken == "" {
-		sylog.Fatalf("Unable to submit build job: %v", authWarning)
+		sylog.Fatalf("Unable to submit build job: %v", remoteWarning)
 	}
 
 	def, err := definitionFromSpec(spec)

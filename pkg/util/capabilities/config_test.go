@@ -11,11 +11,6 @@ import (
 	"testing"
 )
 
-type readFromTest struct {
-	c          Config
-	shouldFail bool
-}
-
 type readWriteTest struct {
 	name string
 	c    Config
@@ -73,25 +68,6 @@ func TestReadFromWriteTo(t *testing.T) {
 
 	})
 
-}
-
-func checkReadFrom(t *testing.T, confExpected Config, shouldFail bool) {
-	var r *bytes.Buffer
-
-	confExpected.WriteTo(r)
-
-	confActual, err := ReadFrom(r)
-	if err == nil && shouldFail {
-		t.Errorf("unexpected success running test")
-		return
-	} else if err != nil && !shouldFail {
-		t.Errorf("unexpected failure running test")
-		return
-	}
-
-	if !reflect.DeepEqual(confExpected, *confActual) {
-		t.Errorf("ReadFrom returned incorrect capability config")
-	}
 }
 
 type capTest struct {
@@ -320,6 +296,21 @@ func TestDropUserCaps(t *testing.T) {
 			caps: []string{"CAP_DAC_OVERRIDE"},
 		},
 		{
+			name: "drop non-existent capability from user",
+			old: Config{
+				Users: map[string][]string{
+					"root": {"CAP_SYS_ADMIN"},
+				},
+			},
+			new: Config{
+				Users: map[string][]string{
+					"root": {"CAP_SYS_ADMIN"},
+				},
+			},
+			id:   "root",
+			caps: []string{"CAP_DAC_OVERRIDE"},
+		},
+		{
 			name: "drop existing user multiple caps",
 			old: Config{
 				Users: map[string][]string{
@@ -342,9 +333,7 @@ func TestDropUserCaps(t *testing.T) {
 				},
 			},
 			new: Config{
-				Users: map[string][]string{
-					"root": {},
-				},
+				Users: map[string][]string{},
 			},
 			id:   "root",
 			caps: []string{"CAP_SYS_ADMIN", "CAP_DAC_OVERRIDE", "CAP_CHOWN"},
@@ -423,6 +412,21 @@ func TestDropGroupCaps(t *testing.T) {
 			caps: []string{"CAP_DAC_OVERRIDE"},
 		},
 		{
+			name: "drop non-existent capability from group",
+			old: Config{
+				Groups: map[string][]string{
+					"root": {"CAP_SYS_ADMIN"},
+				},
+			},
+			new: Config{
+				Groups: map[string][]string{
+					"root": {"CAP_SYS_ADMIN"},
+				},
+			},
+			id:   "root",
+			caps: []string{"CAP_DAC_OVERRIDE"},
+		},
+		{
 			name: "drop existing group multiple caps",
 			old: Config{
 				Groups: map[string][]string{
@@ -445,9 +449,7 @@ func TestDropGroupCaps(t *testing.T) {
 				},
 			},
 			new: Config{
-				Groups: map[string][]string{
-					"root": {},
-				},
+				Groups: map[string][]string{},
 			},
 			id:   "root",
 			caps: []string{"CAP_SYS_ADMIN", "CAP_DAC_OVERRIDE", "CAP_CHOWN"},
